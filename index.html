@@ -1,23 +1,24 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>All-in-One Smart Calculator</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ultimate Smart Calculator</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      padding: 20px;
-      max-width: 500px;
+      max-width: 600px;
       margin: auto;
+      padding: 20px;
       background: #f5f5f5;
       color: #222;
       transition: background 0.3s, color 0.3s;
     }
     h2 {
       text-align: center;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
     }
-    input, select, button {
+    input, select, button, textarea {
       width: 100%;
       padding: 12px;
       margin: 10px 0;
@@ -27,10 +28,10 @@
       box-sizing: border-box;
     }
     button {
-      cursor: pointer;
       background: #007BFF;
       color: white;
       border: none;
+      cursor: pointer;
       font-weight: bold;
       transition: background 0.3s;
     }
@@ -65,6 +66,7 @@
       text-align: center;
       box-shadow: inset 0 0 5px #ddd;
       word-wrap: break-word;
+      min-height: 40px;
     }
     .history-section {
       margin-top: 20px;
@@ -87,7 +89,7 @@
       background: #121212;
       color: #eee;
     }
-    .dark-mode input, .dark-mode select, .dark-mode button {
+    .dark-mode input, .dark-mode select, .dark-mode button, .dark-mode textarea {
       background: #333;
       color: #eee;
       border-color: #555;
@@ -104,7 +106,7 @@
       body {
         padding: 10px;
       }
-      input, select, button {
+      input, select, button, textarea {
         font-size: 14px;
         padding: 10px;
       }
@@ -116,22 +118,30 @@
 </head>
 <body>
 
-  <h2>🔍 Smart Calculator</h2>
+  <h2>Ultimate Smart Calculator</h2>
   <button id="darkToggle">Toggle Dark Mode</button>
 
-  <input type="text" id="search" placeholder="What do you want to calculate? e.g. addition, sin">
+  <input type="text" id="search" placeholder="Search: e.g. addition, sin, expression" autocomplete="off" />
   <div class="suggestions" id="suggestions"></div>
 
-  <!-- Calculation UI -->
+  <!-- Basic Math UI -->
   <div class="calc-section" id="math-ui">
-    <input type="number" id="num1" placeholder="First Number">
-    <input type="number" id="num2" placeholder="Second Number">
+    <input type="number" id="num1" placeholder="First Number" />
+    <input type="number" id="num2" placeholder="Second Number" />
     <div class="result" id="math-result">Result: </div>
   </div>
 
+  <!-- Trig UI -->
   <div class="calc-section" id="trig-ui">
-    <input type="number" id="angle" placeholder="Enter Angle (Degrees)">
+    <input type="number" id="angle" placeholder="Angle in Degrees" />
     <div class="result" id="trig-result">Result: </div>
+  </div>
+
+  <!-- Expression Parser UI -->
+  <div class="calc-section" id="expr-ui">
+    <input type="number" id="theta" placeholder="Set θ (theta) in Degrees (default 0)" />
+    <textarea id="expr" rows="3" placeholder="Type math expression, e.g. sin(theta) + cos(theta)"></textarea>
+    <div class="result" id="expr-result">Result: </div>
   </div>
 
   <div class="history-section">
@@ -139,18 +149,30 @@
     <div id="history" class="history-list"></div>
   </div>
 
+  <!-- math.js library for parsing expressions -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
+
   <script>
     const search = document.getElementById("search");
     const suggestions = document.getElementById("suggestions");
     const mathUI = document.getElementById("math-ui");
     const trigUI = document.getElementById("trig-ui");
+    const exprUI = document.getElementById("expr-ui");
+
     const num1 = document.getElementById("num1");
     const num2 = document.getElementById("num2");
     const mathResult = document.getElementById("math-result");
+
     const angle = document.getElementById("angle");
     const trigResult = document.getElementById("trig-result");
-    const historyDiv = document.getElementById('history');
-    const darkToggle = document.getElementById('darkToggle');
+
+    const theta = document.getElementById("theta");
+    const expr = document.getElementById("expr");
+    const exprResult = document.getElementById("expr-result");
+
+    const historyDiv = document.getElementById("history");
+
+    const darkToggle = document.getElementById("darkToggle");
 
     const keywords = {
       addition: "add",
@@ -168,15 +190,19 @@
       tan: "tan",
       sec: "sec",
       cosec: "cosec",
-      cot: "cot"
+      cot: "cot",
+      expression: "expr",
+      expr: "expr"
     };
 
     function showSuggestions(val) {
-      suggestions.innerHTML = '';
+      suggestions.innerHTML = "";
       if (!val) return;
-      const entries = Object.keys(keywords).filter(k => k.includes(val.toLowerCase()));
+      const entries = Object.keys(keywords).filter(k =>
+        k.includes(val.toLowerCase())
+      );
       entries.forEach(entry => {
-        const div = document.createElement('div');
+        const div = document.createElement("div");
         div.textContent = entry;
         div.onclick = () => selectOperation(entry);
         suggestions.appendChild(div);
@@ -185,25 +211,34 @@
 
     function selectOperation(key) {
       const type = keywords[key];
-      suggestions.innerHTML = '';
+      suggestions.innerHTML = "";
       search.value = key;
       clearInputs();
       if (["add", "sub", "mul", "div"].includes(type)) {
+        exprUI.style.display = "none";
         trigUI.style.display = "none";
         mathUI.style.display = "block";
         updateMath(type);
         num1.oninput = () => updateMath(type);
         num2.oninput = () => updateMath(type);
-      } else {
+      } else if (["sin", "cos", "tan", "sec", "cosec", "cot"].includes(type)) {
+        exprUI.style.display = "none";
         mathUI.style.display = "none";
         trigUI.style.display = "block";
         updateTrig(type);
         angle.oninput = () => updateTrig(type);
+      } else if (type === "expr") {
+        mathUI.style.display = "none";
+        trigUI.style.display = "none";
+        exprUI.style.display = "block";
+        evaluateExpr();
+        expr.oninput = evaluateExpr;
+        theta.oninput = evaluateExpr;
       }
     }
 
     function addToHistory(text) {
-      const p = document.createElement('p');
+      const p = document.createElement("p");
       p.textContent = text;
       historyDiv.prepend(p);
     }
@@ -236,28 +271,52 @@
       addToHistory(resText);
     }
 
+    function evaluateExpr() {
+      try {
+        const th = parseFloat(theta.value) || 0;
+        // Scope with theta in radians & trig functions
+        const scope = {
+          theta: (th * Math.PI) / 180,
+          sin: x => Math.sin(x),
+          cos: x => Math.cos(x),
+          tan: x => Math.tan(x),
+          sec: x => 1 / Math.cos(x),
+          cosec: x => 1 / Math.sin(x),
+          cot: x => 1 / Math.tan(x)
+        };
+        const val = math.evaluate(expr.value, scope);
+        const resText = `Result: ${val}`;
+        exprResult.textContent = resText;
+        addToHistory(resText);
+      } catch (err) {
+        exprResult.textContent = "Error: " + err.message;
+      }
+    }
+
     function clearInputs() {
-      num1.value = '';
-      num2.value = '';
-      angle.value = '';
-      mathResult.textContent = 'Result: ';
-      trigResult.textContent = 'Result: ';
+      num1.value = "";
+      num2.value = "";
+      angle.value = "";
+      theta.value = "";
+      mathResult.textContent = "Result: ";
+      trigResult.textContent = "Result: ";
+      exprResult.textContent = "Result: ";
     }
 
     search.addEventListener("input", () => {
       showSuggestions(search.value);
     });
 
-    document.addEventListener("click", (e) => {
+    document.addEventListener("click", e => {
       if (!search.contains(e.target) && !suggestions.contains(e.target)) {
-        suggestions.innerHTML = '';
+        suggestions.innerHTML = "";
       }
     });
 
     darkToggle.onclick = () => {
-      document.body.classList.toggle('dark-mode');
+      document.body.classList.toggle("dark-mode");
     };
   </script>
-
 </body>
 </html>
+
